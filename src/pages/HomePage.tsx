@@ -4,11 +4,13 @@ import { SettingsDialog } from '@/components/SettingsDialog';
 import { FileUpload } from '@/components/FileUpload';
 import { ProcessingStatus } from '@/components/ProcessingStatus';
 import { BrandPackDisplay } from '@/components/BrandPackDisplay';
+import { ContentGenerator } from '@/components/ContentGenerator';
 import { useBrandGeneration } from '@/hooks/useBrandGeneration';
 import { useStore } from '@/store/useStore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Palette, Sparkles, Target, Zap } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Palette, Sparkles, Target, Zap, FileText, Eye } from 'lucide-react';
 import { Toaster } from 'sonner';
 
 export const HomePage: React.FC = () => {
@@ -162,7 +164,27 @@ export const HomePage: React.FC = () => {
                 Create New Brand Pack
               </Button>
             </div>
-            <BrandPackDisplay brandPack={currentBrandPack} />
+            
+            <Tabs defaultValue="brand-pack" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="brand-pack" className="flex items-center space-x-2">
+                  <Eye className="h-4 w-4" />
+                  <span>Brand Pack</span>
+                </TabsTrigger>
+                <TabsTrigger value="content-generator" className="flex items-center space-x-2">
+                  <FileText className="h-4 w-4" />
+                  <span>Content Generator</span>
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="brand-pack">
+                <BrandPackDisplay brandPack={currentBrandPack} />
+              </TabsContent>
+              
+              <TabsContent value="content-generator">
+                <ContentGenerator brandPack={currentBrandPack} />
+              </TabsContent>
+            </Tabs>
           </div>
         )}
       </main>

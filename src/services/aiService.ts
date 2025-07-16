@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { BrandPack } from '@/types/brand';
+import { DeliverableTemplate } from '@/constants/deliverables';
 
 interface AIServiceConfig {
   apiKey: string;
@@ -12,6 +13,14 @@ interface ProcessContentParams {
   sourceType: 'website' | 'document';
   sourceUrl?: string;
   fileName?: string;
+}
+
+interface GenerateDeliverableParams {
+  brandPack: BrandPack;
+  template: DeliverableTemplate;
+  title: string;
+  description: string;
+  additionalRequirements?: string;
 }
 
 export class AIService {
@@ -67,6 +76,138 @@ export class AIService {
       console.error('AI Service Error:', error);
       throw new Error('Failed to generate brand pack. Please check your API settings and try again.');
     }
+  }
+
+  async generateDeliverable(params: GenerateDeliverableParams): Promise<string> {
+    const prompt = this.buildDeliverablePrompt(params);
+    
+    const messages = [
+      {
+        role: 'user',
+        content: prompt
+      }
+    ];
+
+    try {
+      const response = await axios.post(
+        'https://openrouter.ai/api/v1/chat/completions',
+        {
+          model: this.config.model,
+          messages,
+          max_tokens: 6000,
+          temperature: 0.3,
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${this.config.apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': window.location.origin,
+            'X-Title': 'Brand Pack Generator'
+          }
+        }
+      );
+
+      const aiResponse = response.data.choices[0].message.content;
+      return this.extractHtmlFromResponse(aiResponse);
+    } catch (error) {
+      console.error('Deliverable generation error:', error);
+      throw new Error('Failed to generate deliverable. Please check your API settings and try again.');
+    }
+  }
+
+  private buildDeliverablePrompt(params: GenerateDeliverableParams): string {
+    const { brandPack, template, title, description, additionalRequirements } = params;
+    
+    return `
+Create a professional ${template.name} document using the provided brand pack. Generate complete HTML that can be saved as PDF.
+
+BRAND PACK DETAILS:
+Brand Name: ${brandPack.name}
+Description: ${brandPack.description}
+
+Colors:
+- Primary: ${brandPack.colors.primary}
+- Secondary: ${brandPack.colors.secondary}
+- Accent: ${brandPack.colors.accent}
+- Neutral: ${brandPack.colors.neutral}
+- Background: ${brandPack.colors.background}
+- Text: ${brandPack.colors.text}
+
+Fonts:
+- Heading: ${brandPack.fonts.heading}
+- Body: ${brandPack.fonts.body}
+- Accent: ${brandPack.fonts.accent}
+
+Brand Vision:
+- Mission: ${brandPack.vision.mission}
+- Vision: ${brandPack.vision.vision}
+- Values: ${brandPack.vision.values.join(', ')}
+- Personality: ${brandPack.vision.personality.join(', ')}
+- Tone: ${brandPack.vision.tone}
+
+DOCUMENT REQUIREMENTS:
+Template: ${template.name}
+Title: ${title}
+Description: ${description}
+${additionalRequirements ? `Additional Requirements: ${additionalRequirements}` : ''}
+
+Format: ${template.format}
+Template Description: ${template.description}
+
+GENERATE:
+Create a complete, professional HTML document that:
+1. Uses the brand colors consistently throughout
+2. Implements the brand fonts (use web-safe fallbacks)
+3. Reflects the brand personality and tone
+4. Includes appropriate content based on the description
+5. Is properly formatted for ${template.format} size
+6. Includes CSS styles inline for PDF generation
+7. Has professional layout and typography
+8. Incorporates brand elements naturally
+
+CSS REQUIREMENTS:
+- Use @page CSS for print formatting
+- Set appropriate margins and page size
+- Ensure colors are print-friendly
+- Use proper typography hierarchy
+- Include responsive design principles
+
+CONTENT GUIDELINES:
+- Make content relevant to the template type
+- Use placeholder content that makes sense
+- Include realistic details and information
+- Maintain professional tone throughout
+- Ensure brand consistency
+
+Respond with ONLY the complete HTML document, no explanations or markdown formatting.`;
+  }
+
+  private extractHtmlFromResponse(response: string): string {
+    // Try to extract HTML from the response
+    const htmlMatch = response.match(/<!DOCTYPE html[\s\S]*<\/html>/i) || 
+                     response.match(/<html[\s\S]*<\/html>/i) ||
+                     response.match(/<div[\s\S]*<\/div>/i);
+    
+    if (htmlMatch) {
+      return htmlMatch[0];
+    }
+    
+    // If no complete HTML found, wrap the response in a basic HTML structure
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generated Document</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+        @page { size: A4; margin: 1in; }
+    </style>
+</head>
+<body>
+${response}
+</body>
+</html>`;
   }
 
   private buildPrompt(params: ProcessContentParams): string {
