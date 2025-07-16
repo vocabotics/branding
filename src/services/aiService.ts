@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { BrandPack } from '@/types/brand';
 import { DeliverableTemplate } from '@/constants/deliverables';
+import { AIEnhancementParams } from '@/hooks/useAIEnhancement';
 
 interface AIServiceConfig {
   apiKey: string;
@@ -17,10 +18,13 @@ interface ProcessContentParams {
 
 interface GenerateDeliverableParams {
   brandPack: BrandPack;
-  template: DeliverableTemplate;
+  templateId: string;
   title: string;
   description: string;
   additionalRequirements?: string;
+  targetAudience?: string;
+  keyMessages?: string;
+  callToAction?: string;
 }
 
 export class AIService {
@@ -78,8 +82,13 @@ export class AIService {
     }
   }
 
-  async generateDeliverable(params: GenerateDeliverableParams): Promise<string> {
-    const prompt = this.buildDeliverablePrompt(params);
+  async generateContent(params: GenerateDeliverableParams): Promise<string> {
+    const template = DELIVERABLE_TEMPLATES.find(t => t.id === params.templateId);
+    if (!template) {
+      throw new Error('Template not found');
+    }
+
+    const prompt = this.buildDeliverablePrompt({ ...params, template });
     
     const messages = [
       {
@@ -115,8 +124,84 @@ export class AIService {
     }
   }
 
-  private buildDeliverablePrompt(params: GenerateDeliverableParams): string {
-    const { brandPack, template, title, description, additionalRequirements } = params;
+  async enhanceContent(params: AIEnhancementParams): Promise<string> {
+    const prompt = this.buildEnhancementPrompt(params);
+    
+    const messages = [
+      {
+        role: 'user',
+        content: prompt
+      }
+    ];
+
+    try {
+      const response = await axios.post(
+        'https://openrouter.ai/api/v1/chat/completions',
+        {
+          model: this.config.model,
+          messages,
+          max_tokens: 1000,
+          temperature: 0.7,
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${this.config.apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': window.location.origin,
+            'X-Title': 'Brand Pack Generator'
+          }
+        }
+      );
+
+      const aiResponse = response.data.choices[0].message.content;
+      return aiResponse.trim();
+    } catch (error) {
+      console.error('Content enhancement error:', error);
+      throw new Error('Failed to enhance content. Please check your API settings and try again.');
+    }
+  }
+
+  private buildEnhancementPrompt(params: AIEnhancementParams): string {
+    const { brandPack, fieldType, currentContent, template } = params;
+    
+    const fieldInstructions = {
+      title: 'Create a compelling, professional title that captures attention and clearly communicates the document\'s purpose.',
+      description: 'Expand and improve this description to be more detailed, engaging, and comprehensive while maintaining clarity.',
+      targetAudience: 'Refine and expand this target audience description to be more specific and detailed about who this document is for.',
+      keyMessages: 'Enhance these key messages to be more impactful, clear, and aligned with the brand personality.',
+      callToAction: 'Improve this call to action to be more compelling, specific, and action-oriented.',
+      additionalRequirements: 'Enhance these requirements to be more detailed and specific about formatting, style, and content preferences.'
+    };
+
+    return `
+You are enhancing content for a ${template?.name || 'business document'} using the following brand information:
+
+BRAND CONTEXT:
+Brand Name: ${brandPack.name}
+Brand Description: ${brandPack.description}
+Brand Personality: ${brandPack.vision.personality.join(', ')}
+Tone of Voice: ${brandPack.vision.tone}
+Core Values: ${brandPack.vision.values.join(', ')}
+
+FIELD TYPE: ${fieldType}
+CURRENT CONTENT: "${currentContent}"
+
+TASK: ${fieldInstructions[fieldType as keyof typeof fieldInstructions] || 'Improve and enhance this content.'}
+
+ENHANCEMENT GUIDELINES:
+1. Maintain the brand's tone of voice (${brandPack.vision.tone})
+2. Reflect the brand personality: ${brandPack.vision.personality.join(', ')}
+3. Align with brand values: ${brandPack.vision.values.join(', ')}
+4. Keep the enhanced content appropriate for the target document type
+5. Make improvements that are meaningful and add value
+6. Ensure the content remains professional and polished
+7. Don't make it overly verbose - keep it concise but improved
+
+Respond with ONLY the enhanced content, no explanations or additional text.`;
+  }
+
+  private buildDeliverablePrompt(params: GenerateDeliverableParams & { template: DeliverableTemplate }): string {
+    const { brandPack, template, title, description, additionalRequirements, targetAudience, keyMessages, callToAction } = params;
     
     return `
 Create a professional ${template.name} document using the provided brand pack. Generate complete HTML that can be saved as PDF.
@@ -149,6 +234,9 @@ DOCUMENT REQUIREMENTS:
 Template: ${template.name}
 Title: ${title}
 Description: ${description}
+${targetAudience ? `Target Audience: ${targetAudience}` : ''}
+${keyMessages ? `Key Messages: ${keyMessages}` : ''}
+${callToAction ? `Call to Action: ${callToAction}` : ''}
 ${additionalRequirements ? `Additional Requirements: ${additionalRequirements}` : ''}
 
 Format: ${template.format}
@@ -164,6 +252,9 @@ Create a complete, professional HTML document that:
 6. Includes CSS styles inline for PDF generation
 7. Has professional layout and typography
 8. Incorporates brand elements naturally
+9. Addresses the target audience appropriately
+10. Includes the key messages effectively
+11. Features a compelling call to action
 
 CSS REQUIREMENTS:
 - Use @page CSS for print formatting
@@ -174,10 +265,11 @@ CSS REQUIREMENTS:
 
 CONTENT GUIDELINES:
 - Make content relevant to the template type
-- Use placeholder content that makes sense
-- Include realistic details and information
-- Maintain professional tone throughout
+- Use the provided information to create realistic, detailed content
+- Include professional details and information
+- Maintain the brand tone (${brandPack.vision.tone}) throughout
 - Ensure brand consistency
+- Create engaging, valuable content that serves the document's purpose
 
 Respond with ONLY the complete HTML document, no explanations or markdown formatting.`;
   }
@@ -333,3 +425,6 @@ Ensure all content is professional, comprehensive, and suitable for a complete b
     }
   }
 }
+
+// Import the DELIVERABLE_TEMPLATES
+import { DELIVERABLE_TEMPLATES } from '@/constants/deliverables';

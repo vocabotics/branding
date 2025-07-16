@@ -4,17 +4,18 @@ import { SettingsDialog } from '@/components/SettingsDialog';
 import { FileUpload } from '@/components/FileUpload';
 import { ProcessingStatus } from '@/components/ProcessingStatus';
 import { BrandPackDisplay } from '@/components/BrandPackDisplay';
-import { ContentGenerator } from '@/components/ContentGenerator';
+import { ContentGenerationWizard } from '@/components/ContentGenerationWizard';
 import { useBrandGeneration } from '@/hooks/useBrandGeneration';
 import { useStore } from '@/store/useStore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Palette, Sparkles, Target, Zap, FileText, Eye } from 'lucide-react';
+import { Palette, Sparkles, Target, Zap, FileText, Eye, Wand2 } from 'lucide-react';
 import { Toaster } from 'sonner';
 
 export const HomePage: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
   const { currentBrandPack, processingStatus, apiKey } = useStore();
   const { generateFromUrl, generateFromFile, isProcessing } = useBrandGeneration();
 
@@ -160,29 +161,30 @@ export const HomePage: React.FC = () => {
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold text-foreground">Your Brand Pack</h2>
-              <Button onClick={handleNewBrandPack} variant="outline">
-                Create New Brand Pack
-              </Button>
+              <div className="flex space-x-2">
+                <Button 
+                  onClick={() => setShowWizard(true)}
+                  className="flex items-center space-x-2"
+                >
+                  <Wand2 className="h-4 w-4" />
+                  <span>Create Content</span>
+                </Button>
+                <Button onClick={handleNewBrandPack} variant="outline">
+                  Create New Brand Pack
+                </Button>
+              </div>
             </div>
             
             <Tabs defaultValue="brand-pack" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-1">
                 <TabsTrigger value="brand-pack" className="flex items-center space-x-2">
                   <Eye className="h-4 w-4" />
-                  <span>Brand Pack</span>
-                </TabsTrigger>
-                <TabsTrigger value="content-generator" className="flex items-center space-x-2">
-                  <FileText className="h-4 w-4" />
-                  <span>Content Generator</span>
+                  <span>Brand Pack Overview</span>
                 </TabsTrigger>
               </TabsList>
               
               <TabsContent value="brand-pack">
                 <BrandPackDisplay brandPack={currentBrandPack} />
-              </TabsContent>
-              
-              <TabsContent value="content-generator">
-                <ContentGenerator brandPack={currentBrandPack} />
               </TabsContent>
             </Tabs>
           </div>
@@ -193,6 +195,13 @@ export const HomePage: React.FC = () => {
         open={showSettings} 
         onOpenChange={setShowSettings} 
       />
+      
+      {showWizard && currentBrandPack && (
+        <ContentGenerationWizard 
+          brandPack={currentBrandPack}
+          onClose={() => setShowWizard(false)}
+        />
+      )}
       
       <Toaster position="top-right" />
     </div>

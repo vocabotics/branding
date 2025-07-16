@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useStore } from '@/store/useStore';
 import { AIService } from '@/services/aiService';
 import { BrandPack } from '@/types/brand';
-import { DELIVERABLE_TEMPLATES } from '@/constants/deliverables';
 import { toast } from 'sonner';
 
 export interface ContentGenerationParams {
@@ -11,6 +10,9 @@ export interface ContentGenerationParams {
   title: string;
   description: string;
   additionalRequirements?: string;
+  targetAudience?: string;
+  keyMessages?: string;
+  callToAction?: string;
 }
 
 export const useContentGeneration = () => {
@@ -25,19 +27,8 @@ export const useContentGeneration = () => {
     setIsGenerating(true);
 
     try {
-      const template = DELIVERABLE_TEMPLATES.find(t => t.id === params.templateId);
-      if (!template) {
-        throw new Error('Template not found');
-      }
-
       const aiService = new AIService({ apiKey, model });
-      const htmlContent = await aiService.generateDeliverable({
-        brandPack: params.brandPack,
-        template,
-        title: params.title,
-        description: params.description,
-        additionalRequirements: params.additionalRequirements
-      });
+      const htmlContent = await aiService.generateContent(params);
 
       return htmlContent;
     } catch (error) {
